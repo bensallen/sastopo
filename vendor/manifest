@@ -1,0 +1,21 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/gwenn/yacr",
+			"repository": "https://github.com/gwenn/yacr",
+			"vcs": "git",
+			"revision": "0fd2e52e286599a849cab09f70be7559208c4b26",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/ungerik/go-sysfs",
+			"repository": "https://github.com/ungerik/go-sysfs",
+			"vcs": "git",
+			"revision": "f99817986ed8e7af04374214c62af7cfef260542",
+			"branch": "master",
+			"notests": true
+		}
+	]
+}
