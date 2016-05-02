@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"gitlab.alcf.anl.gov/jlse/stopo/scsi"
+	"gitlab.alcf.anl.gov/jlse/sastopo/scsi"
 )
 
 func main() {
