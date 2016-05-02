@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"gitlab.alcf.anl.gov/jlse/sastopo/scsi"
+	"gitlab.alcf.anl.gov/jlse/sastopo/lib"
 )
 
 func main() {
@@ -11,5 +11,8 @@ func main() {
 	if err != nil {
 		fmt.Print(err)
 	}
-	fmt.Print(devices)
+	for _, device := range devices {
+		fmt.Print(*device)
+	}
+
 }
