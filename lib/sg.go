@@ -1,4 +1,4 @@
-package scsi
+package sastopo
 
 import (
 	"os"
@@ -23,6 +23,10 @@ type Device struct {
 	Vendor     string
 	Rev        string
 	SasAddress string
+	Serial     string
+	Slot       int
+	Enclosure  *Device
+	HBA        *HBA
 }
 
 func itob(i int) bool {
@@ -61,6 +65,26 @@ func (d *Device) updateSysfsAttrs() error {
 	return nil
 }
 
+func (d *Device) updateDriveSerial() error {
+	return nil
+}
+
+func (d *Device) updateSerial() error {
+	switch d.Type {
+	case 0:
+		if err := d.updateDriveSerial(); err != nil {
+			return err
+		}
+	case 13:
+		if err := d.updateEnclosureSerial(); err != nil {
+			return err
+		}
+	default:
+		return &errUnknownType{"dev: /dev/sg" + strconv.Itoa(d.ID) + " type: " + strconv.Itoa(d.Type)}
+	}
+	return nil
+}
+
 // SgDevices returns map[int]Device of all SG devices
 func SgDevices(sgDevicesPath string) (map[int]*Device, error) {
 	var devices = map[int]*Device{}
@@ -89,6 +113,9 @@ func SgDevices(sgDevicesPath string) (map[int]*Device, error) {
 			Online: itob(Online),
 		}
 		if err := devices[ID].updateSysfsAttrs(); err != nil {
+			return devices, err
+		}
+		if err := devices[ID].updateSerial(); err != nil {
 			return devices, err
 		}
 

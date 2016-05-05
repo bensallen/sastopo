@@ -1,4 +1,4 @@
-package scsi
+package sastopo
 
 import "testing"
 
