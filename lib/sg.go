@@ -19,8 +19,8 @@ type Device struct {
 	Qdepth     int
 	Busy       bool
 	Online     bool
-	Model      string
 	Vendor     string
+	Model      string
 	Rev        string
 	SasAddress string
 	Serial     string
@@ -66,6 +66,11 @@ func (d *Device) updateSysfsAttrs() error {
 }
 
 func (d *Device) updateDriveSerial() error {
+	sn, err := vpd80(d.ID)
+	if err != nil {
+		return err
+	}
+	d.Serial = sn
 	return nil
 }
 
