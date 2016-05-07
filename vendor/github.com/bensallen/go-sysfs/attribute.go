@@ -161,7 +161,7 @@ func (attrib *Attribute) Scanf(format string, args ...interface{}) (err error) {
 	return err
 }
 
-func (attrib *Attribute) ReadBytes() (data []byte, err error) {
+func (attrib *Attribute) ReadAllBytes() (data []byte, err error) {
 	if attrib.File == nil {
 		err = attrib.Open()
 		if err != nil {
@@ -195,7 +195,7 @@ func (attrib *Attribute) WriteBytes(data []byte) (err error) {
 	return err
 }
 
-func (attrib *Attribute) ReadByte() (value byte, err error) {
+func (attrib *Attribute) ReadBytes(offset int64, count int) (data []byte, n int, err error) {
 	if attrib.File == nil {
 		err = attrib.Open()
 		if err != nil {
@@ -208,8 +208,13 @@ func (attrib *Attribute) ReadByte() (value byte, err error) {
 			}
 		}()
 	}
-	data := make([]byte, 1)
-	_, err = attrib.File.ReadAt(data, 0)
+	data = make([]byte, count)
+	n, err = attrib.File.ReadAt(data, offset)
+	return data, n, err
+}
+
+func (attrib *Attribute) ReadByte() (byte, error) {
+	data, _, err := attrib.ReadBytes(0, 1)
 	return data[0], err
 }
 

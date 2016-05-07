@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	devices, err := sastopo.SgDevices("/proc/scsi/sg/devices")
+	devices, err := sastopo.SgDevices2()
 	if err != nil {
 		fmt.Print(err)
 	}

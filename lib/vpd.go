@@ -2,44 +2,17 @@ package sastopo
 
 import (
 	"io"
-	"os"
-	"strconv"
+
+	"github.com/bensallen/go-sysfs"
 )
 
-// trimPoints loops through a []byte looking for left trim and right trim points
-// for trimming 0x00 (null) and 0x20 (ascii space)
-func trimPoints(line []byte) (start int, stop int) {
+func vpd80(obj sysfs.Object) (string, error) {
+	vpdPg80, err := obj.Attribute("vpd_pg80")
 
-	//left trim point
-	for i := 0; i < len(line); i++ {
-		if line[i] == 0x20 || line[i] == 0x00 {
-			continue
-		} else {
-			start = i
-			break
-		}
-	}
-
-	//right trim point
-	for i := len(line) - 1; i >= 0; i-- {
-		if line[i] == 0x20 || line[i] == 0x00 {
-			continue
-		} else {
-			stop = i + 1
-			break
-		}
-	}
-	return start, stop
-}
-
-func vpd80(sg int) (string, error) {
-	file, err := os.Open("/sys/class/scsi_generic/sg" + strconv.Itoa(sg) + "/device/vpd_pg80")
-	defer file.Close()
-	if err != nil {
-		return "", err
-	}
 	line := make([]byte, 128)
-	n, err := file.ReadAt(line, 4)
+
+	line, n, err := vpdPg80.ReadBytes(4, 128)
+
 	if err != nil && err != io.EOF {
 		return "", err
 	} else if n == 0 {

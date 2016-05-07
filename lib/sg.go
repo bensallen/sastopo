@@ -1,24 +1,17 @@
 package sastopo
 
 import (
-	"os"
 	"strconv"
 
-	"github.com/gwenn/yacr"
-	"github.com/ungerik/go-sysfs"
+	"github.com/bensallen/go-sysfs"
 )
 
 // Device is a SCSI Generic Device
 type Device struct {
 	Host       int
 	Chan       int
-	ID         int
-	Lun        int
+	ID         string
 	Type       int
-	Opens      int
-	Qdepth     int
-	Busy       bool
-	Online     bool
 	Vendor     string
 	Model      string
 	Rev        string
@@ -29,30 +22,27 @@ type Device struct {
 	HBA        *HBA
 }
 
-func itob(i int) bool {
-	if i == 0 {
-		return false
-	}
-	return true
-}
-
 // updateSysfsAttrs adds or updates Model, Vendor, Rev, and SasAddress from sysfs for a SG device
-func (d *Device) updateSysfsAttrs() error {
-	sysfsObject := sysfs.Class.Object("scsi_generic").SubObject("sg" + strconv.Itoa(d.ID)).SubObject("device")
+func (d *Device) updateSysfsAttrs(obj sysfs.Object) error {
 
-	model, err := sysfsObject.Attribute("model").Read()
+	model, err := obj.Attribute("model").Read()
 	if err != nil {
 		return err
 	}
-	vendor, err := sysfsObject.Attribute("vendor").Read()
+	vendor, err := obj.Attribute("vendor").Read()
 	if err != nil {
 		return err
 	}
-	rev, err := sysfsObject.Attribute("rev").Read()
+	rev, err := obj.Attribute("rev").Read()
 	if err != nil {
 		return err
 	}
-	sasAddress, err := sysfsObject.Attribute("sas_address").Read()
+	sasAddress, err := obj.Attribute("sas_address").Read()
+	if err != nil {
+		return err
+	}
+
+	devType, err := obj.Attribute("type").ReadInt()
 	if err != nil {
 		return err
 	}
@@ -61,12 +51,13 @@ func (d *Device) updateSysfsAttrs() error {
 	d.Vendor = vendor
 	d.Rev = rev
 	d.SasAddress = sasAddress
+	d.Type, _ = devType
 
 	return nil
 }
 
-func (d *Device) updateDriveSerial() error {
-	sn, err := vpd80(d.ID)
+func (d *Device) updateDriveSerial(obj sysfs.Object) error {
+	sn, err := vpd80(obj)
 	if err != nil {
 		return err
 	}
@@ -74,24 +65,24 @@ func (d *Device) updateDriveSerial() error {
 	return nil
 }
 
-func (d *Device) updateSerial() error {
+func (d *Device) updateSerial(obj sysfs.Object) error {
 	switch d.Type {
 	case 0:
-		if err := d.updateDriveSerial(); err != nil {
+		if err := d.updateDriveSerial(obj); err != nil {
 			return err
 		}
 	case 13:
-		if err := d.updateEnclosureSerial(); err != nil {
+		if err := d.updateEnclosureSerial(obj); err != nil {
 			return err
 		}
 	default:
-		return &errUnknownType{"dev: /dev/sg" + strconv.Itoa(d.ID) + " type: " + strconv.Itoa(d.Type)}
+		return &errUnknownType{"dev: " + d.ID + " type: " + strconv.Itoa(d.Type)}
 	}
 	return nil
 }
 
 // SgDevices returns map[int]Device of all SG devices
-func SgDevices(sgDevicesPath string) (map[int]*Device, error) {
+/*func SgDevices(sgDevicesPath string) (map[int]*Device, error) {
 	var devices = map[int]*Device{}
 
 	file, err := os.Open(sgDevicesPath)
@@ -127,4 +118,24 @@ func SgDevices(sgDevicesPath string) (map[int]*Device, error) {
 	}
 	err = file.Close()
 	return devices, err
+}*/
+
+// SgDevices2 returns map[int]Device of all SG devices
+func SgDevices2() (map[string]*Device, error) {
+	var devices = map[string]*Device{}
+	sysfsObjects := sysfs.Class.Object("scsi_device").SubObjects()
+
+	for d := 0; d <= len(sysfsObjects); d++ {
+		devices[sysfsObjects[d].Name()] = &Device{
+			ID: sysfsObjects[d].Name(),
+		}
+		if err := devices[sysfsObjects[d].Name()].updateSysfsAttrs(sysfsObjects[d].SubObject("device")); err != nil {
+			return devices, err
+		}
+		if err := devices[sysfsObjects[d].Name()].updateSerial(sysfsObjects[d].SubObject("device")); err != nil {
+			return devices, err
+		}
+	}
+	return devices, nil
+
 }
