@@ -7,12 +7,12 @@ import (
 )
 
 func main() {
-	devices, err := sastopo.SgDevices2()
+	devices, err := sastopo.ScsiDevices()
 	if err != nil {
 		fmt.Print(err)
 	}
 	for _, device := range devices {
-		fmt.Printf("Found SG: %d, serial: %#v \n", device.ID, device.Serial)
+		fmt.Printf("Found Device: %#v \n", device.OtherPaths)
 	}
 
 }

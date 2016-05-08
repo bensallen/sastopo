@@ -1,8 +1,6 @@
 package sastopo
 
-import "testing"
-
-func TestSgDevices(t *testing.T) {
+/*func TestSgDevices(t *testing.T) {
 	devices, err := SgDevices("/proc/scsi/sg/devices")
 	if err != nil {
 		t.Fatal(err)
@@ -10,7 +8,7 @@ func TestSgDevices(t *testing.T) {
 	if len(devices) == 0 {
 		t.Fatal("No values")
 	}
-}
+}*/
 
 /*func TestSgAttributes(t *testing.T) {
 	attributes := SgAttributes(0)

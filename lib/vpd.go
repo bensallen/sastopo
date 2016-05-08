@@ -7,7 +7,7 @@ import (
 )
 
 func vpd80(obj sysfs.Object) (string, error) {
-	vpdPg80, err := obj.Attribute("vpd_pg80")
+	vpdPg80 := obj.Attribute("vpd_pg80")
 
 	line := make([]byte, 128)
 

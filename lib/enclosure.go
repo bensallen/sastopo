@@ -1,13 +1,11 @@
 package sastopo
 
-import "github.com/bensallen/go-sysfs"
-
-func (d *Device) updateEnclosureSerial(obj sysfs.Object) error {
+func (d *Device) updateEnclosureSerial() error {
 	switch d.Model {
 	case "SA4600":
 		return nil
 	default:
-		sn, err := vpd80(obj)
+		sn, err := vpd80(d.sysfsObj)
 		if err != nil {
 			return err
 		}
