@@ -138,7 +138,6 @@ func findOtherPaths(devices map[string]*Device) {
 			}
 
 			if (device1.SasAddress != "" && device1.SasAddress == device2.SasAddress) || (device1.Serial != "" && device1.Serial == device2.Serial) {
-				log.Printf("SasAddress: %s, Serial %s", device1.SasAddress, device1.Serial)
 				if device2.OtherPaths == nil {
 					device2.OtherPaths = map[*Device]bool{}
 				}

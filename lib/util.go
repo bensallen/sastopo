@@ -1,5 +1,11 @@
 package sastopo
 
+import (
+	"bytes"
+	"encoding/hex"
+	"unicode"
+)
+
 func itob(i int) bool {
 	if i == 0 {
 		return false
@@ -31,4 +37,23 @@ func trimPoints(line []byte) (start int, stop int) {
 		}
 	}
 	return start, stop
+}
+
+// sgSesToBytes takes the []byte output from running "sg_ses --hex"
+// drops all whitespace, and attempts to decode the hex charecters
+// into to their actual values.
+func sgSesToBytes(src []byte) ([]byte, int, error) {
+
+	dropWhiteSpace := func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}
+
+	src = bytes.Map(dropWhiteSpace, src)
+	dst := make([]byte, hex.DecodedLen(len(src)))
+	n, err := hex.Decode(dst, src)
+
+	return dst, n, err
 }

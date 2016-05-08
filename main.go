@@ -12,7 +12,7 @@ func main() {
 		fmt.Print(err)
 	}
 	for _, device := range devices {
-		fmt.Printf("Found Device: %#v \n", device.OtherPaths)
+		fmt.Printf("Found Device: %#v \n", device.Serial)
 	}
 
 }
