@@ -1,0 +1,4 @@
+[submodule "vendor/github.com/bensallen/go-sysfs"]
+	path = vendor/github.com/bensallen/go-sysfs
+	url = https://github.com/bensallen/go-sysfs
+	branch = master
