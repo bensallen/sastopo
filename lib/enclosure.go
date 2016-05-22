@@ -2,6 +2,7 @@ package sastopo
 
 import (
 	"log"
+	"os"
 	"os/exec"
 )
 
@@ -39,15 +40,19 @@ func ddnSA4600EnclosureSerial(sg string) (string, error) {
 		page7  []byte
 	)
 
+	if _, err = os.Stat("/dev/" + sg); os.IsNotExist(err) {
+		return sn, err
+	}
+
 	cmd := "sg_ses"
 	args := []string{"--page=0x7", "-I7,0", "--raw", "/dev/" + sg}
 	if cmdOut, err = exec.Command(cmd, args...).Output(); err != nil {
-		log.Printf("Warning, running sg_ses failed: %s", err)
+		log.Printf("Error, running sg_ses failed: %s", err)
 		return sn, err
 	}
 	page7, n, err := sgSesToBytes(cmdOut)
 	if err != nil || n == 0 {
-		log.Printf("Warning, decoding hex output sg_ses failed, found %d bytes: %s", n, err)
+		log.Printf("Error, decoding hex output sg_ses failed, found %d bytes: %s", n, err)
 		return sn, err
 	}
 	//log.Printf("Found %d bytes of data from sg_ses, serial is: %#v", n, string(page7[2068:2084]))
