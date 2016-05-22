@@ -21,12 +21,16 @@ type Device struct {
 	Block      string
 	SG         string
 	Enclosure  *Device
-	Host       string
+	HBA        *HBA
 	Port       string
 	Slot       string
-	HBA        *HBA
-	OtherPaths map[*Device]bool
+	MultiPath  *MultiPathDevice
 	sysfsObj   sysfs.Object
+}
+
+// MultiPathDevice contains Devices which has multiple paths
+type MultiPathDevice struct {
+	Paths map[*Device]bool
 }
 
 // updateSysfsAttrs adds or updates Model, Vendor, Rev, and SasAddress from sysfs for a sysfs object
@@ -51,6 +55,7 @@ func (d *Device) updateSysfsAttrs() error {
 	d.Rev = rev
 
 	sasAddress, err := d.sysfsObj.Attribute("sas_address").Read()
+	// Some devices won't have a sas_address in sysfs, so just warn on it
 	if err != nil {
 		log.Printf("Warning, cannot find sas_address: %s", err)
 	}
@@ -70,7 +75,6 @@ func (d *Device) updateSysfsAttrs() error {
 	sgs := d.sysfsObj.SubObject("scsi_generic").SubObjects()
 	if len(sgs) > 0 {
 		d.SG = sgs[0].Name()
-
 	}
 	return nil
 }
@@ -100,9 +104,16 @@ func (d *Device) updateSerial() error {
 	return nil
 }
 
-func (d *Device) updatePathVars() error {
+// Update HBA and Port attributes of device using the elements of sysfs path
+// of the device
+func (d *Device) updatePathVars(HBAs map[string]*HBA) error {
 	p := strings.Split(string(d.sysfsObj), "/")
-	d.Host = p[6]
+	if HBAs[p[5]] != nil {
+		d.HBA = HBAs[p[5]]
+	} else {
+		HBAs[p[5]] = &HBA{PciID: p[5], Host: p[6]}
+		d.HBA = HBAs[p[5]]
+	}
 	d.Port = p[7]
 
 	return nil
@@ -126,10 +137,16 @@ func (d *Device) updateEnclSlot() error {
 	return nil
 }
 
-func findOtherPaths(devices map[string]*Device) {
+// updateMultiPaths iterates through devices finding multiple paths based on devices
+// with same serial number or SAS Address
+func updateMultiPaths(devices map[string]*Device) map[string]*MultiPathDevice {
+	multiPathDevices := map[string]*MultiPathDevice{}
+
 	for _, device1 := range devices {
-		if device1.OtherPaths == nil {
-			device1.OtherPaths = map[*Device]bool{}
+		if device1.MultiPath == nil {
+			device1.MultiPath = new(MultiPathDevice)
+			device1.MultiPath.Paths = map[*Device]bool{}
+			device1.MultiPath.Paths[device1] = true
 		}
 
 		for _, device2 := range devices {
@@ -137,22 +154,32 @@ func findOtherPaths(devices map[string]*Device) {
 				continue
 			}
 
-			if (device1.SasAddress != "" && device1.SasAddress == device2.SasAddress) || (device1.Serial != "" && device1.Serial == device2.Serial) {
-				if device2.OtherPaths == nil {
-					device2.OtherPaths = map[*Device]bool{}
+			if device1.SasAddress != "" && device1.SasAddress == device2.SasAddress {
+				if device2.MultiPath == nil {
+					device2.MultiPath = device1.MultiPath
 				}
-				device1.OtherPaths[device2] = true
-				device2.OtherPaths[device1] = true
+				device1.MultiPath.Paths[device2] = true
+				multiPathDevices[device1.SasAddress] = device1.MultiPath
+
+			} else if device1.Serial != "" && device1.Serial == device2.Serial {
+				if device2.MultiPath == nil {
+					device2.MultiPath = device1.MultiPath
+				}
+				device1.MultiPath.Paths[device2] = true
+				multiPathDevices[device1.Serial] = device1.MultiPath
 			}
 		}
 	}
+	return multiPathDevices
 }
 
-// ScsiDevices returns map[int]Device of all SCSI devices
-func ScsiDevices() (map[string]*Device, error) {
+// ScsiDevices returns map[string]*Device of all SCSI devices and
+// map[string]*MultiPathDevice of all resolved unique end devices
+func ScsiDevices() (map[string]*Device, map[string]*MultiPathDevice, map[string]*HBA, error) {
 	var devices = map[string]*Device{}
-	scsiDeviceObj := sysfs.Class.Object("scsi_device")
+	var HBAs = map[string]*HBA{}
 
+	scsiDeviceObj := sysfs.Class.Object("scsi_device")
 	sysfsObjects := scsiDeviceObj.SubObjects()
 
 	for d := 0; d < len(sysfsObjects); d++ {
@@ -166,14 +193,14 @@ func ScsiDevices() (map[string]*Device, error) {
 		if err := devices[sysfsObjects[d].Name()].updateSerial(); err != nil {
 			log.Printf("Warning: %s", err)
 		}
-		if err := devices[sysfsObjects[d].Name()].updatePathVars(); err != nil {
+		if err := devices[sysfsObjects[d].Name()].updatePathVars(HBAs); err != nil {
 			log.Printf("Warning: %s", err)
 		}
 		if err := devices[sysfsObjects[d].Name()].updateEnclSlot(); err != nil {
 			log.Printf("Warning: %s", err)
 		}
 	}
-	findOtherPaths(devices)
-	return devices, nil
+	multiPathDevices := updateMultiPaths(devices)
+	return devices, multiPathDevices, HBAs, nil
 
 }
