@@ -111,7 +111,10 @@ func (d *Device) updatePathVars(HBAs map[string]*HBA) error {
 	if HBAs[p[5]] != nil {
 		d.HBA = HBAs[p[5]]
 	} else {
-		HBAs[p[5]] = &HBA{PciID: p[5], Host: p[6]}
+		HBAs[p[5]] = &HBA{
+			PciID: p[5],
+			Host:  p[6],
+		}
 		d.HBA = HBAs[p[5]]
 	}
 	d.Port = p[7]
@@ -137,37 +140,22 @@ func (d *Device) updateEnclSlot() error {
 	return nil
 }
 
-// updateMultiPaths iterates through devices finding multiple paths based on devices
-// with same serial number or SAS Address
-func updateMultiPaths(devices map[string]*Device) map[string]*MultiPathDevice {
-	multiPathDevices := map[string]*MultiPathDevice{}
+func updateMultiPaths(devices map[string]*Device, devicesBySerial map[string]map[*Device]bool, devicesBySASAddress map[string]map[*Device]bool) map[string]*MultiPathDevice {
+	var multiPathDevices = map[string]*MultiPathDevice{}
+	for _, device := range devices {
 
-	for _, device1 := range devices {
-		if device1.MultiPath == nil {
-			device1.MultiPath = new(MultiPathDevice)
-			device1.MultiPath.Paths = map[*Device]bool{}
-			device1.MultiPath.Paths[device1] = true
-		}
-
-		for _, device2 := range devices {
-			if device1 == device2 {
-				continue
+		if devicesBySerial[device.Serial] != nil {
+			device.MultiPath = &MultiPathDevice{
+				Paths: devicesBySerial[device.Serial],
 			}
-
-			if device1.SasAddress != "" && device1.SasAddress == device2.SasAddress {
-				if device2.MultiPath == nil {
-					device2.MultiPath = device1.MultiPath
-				}
-				device1.MultiPath.Paths[device2] = true
-				multiPathDevices[device1.SasAddress] = device1.MultiPath
-
-			} else if device1.Serial != "" && device1.Serial == device2.Serial {
-				if device2.MultiPath == nil {
-					device2.MultiPath = device1.MultiPath
-				}
-				device1.MultiPath.Paths[device2] = true
-				multiPathDevices[device1.Serial] = device1.MultiPath
+			multiPathDevices[device.Serial] = device.MultiPath
+		} else if devicesBySASAddress[device.SasAddress] != nil {
+			device.MultiPath = &MultiPathDevice{
+				Paths: devicesBySASAddress[device.SasAddress],
 			}
+			multiPathDevices[device.SasAddress] = device.MultiPath
+		} else {
+			log.Printf("Warning: Did not find device: %s, in devicesBySerial or devicesBySASAddress", device.ID)
 		}
 	}
 	return multiPathDevices
@@ -176,31 +164,58 @@ func updateMultiPaths(devices map[string]*Device) map[string]*MultiPathDevice {
 // ScsiDevices returns map[string]*Device of all SCSI devices and
 // map[string]*MultiPathDevice of all resolved unique end devices
 func ScsiDevices() (map[string]*Device, map[string]*MultiPathDevice, map[string]*HBA, error) {
-	var devices = map[string]*Device{}
+	var Devices = map[string]*Device{}
+	var DevicesBySerial = map[string]map[*Device]bool{}
+	var DevicesBySASAddress = map[string]map[*Device]bool{}
 	var HBAs = map[string]*HBA{}
+	//var Enclosures = map[string]*Enclosure{}
 
 	scsiDeviceObj := sysfs.Class.Object("scsi_device")
 	sysfsObjects := scsiDeviceObj.SubObjects()
 
 	for d := 0; d < len(sysfsObjects); d++ {
-		devices[sysfsObjects[d].Name()] = &Device{
-			ID:       sysfsObjects[d].Name(),
+		name := sysfsObjects[d].Name()
+		Devices[name] = &Device{
+			ID:       name,
 			sysfsObj: sysfsObjects[d].SubObject("device"),
 		}
-		if err := devices[sysfsObjects[d].Name()].updateSysfsAttrs(); err != nil {
+		if err := Devices[name].updateSysfsAttrs(); err != nil {
 			log.Printf("Warning: %s", err)
 		}
-		if err := devices[sysfsObjects[d].Name()].updateSerial(); err != nil {
+		if err := Devices[name].updateSerial(); err != nil {
 			log.Printf("Warning: %s", err)
 		}
-		if err := devices[sysfsObjects[d].Name()].updatePathVars(HBAs); err != nil {
+		if err := Devices[name].updatePathVars(HBAs); err != nil {
 			log.Printf("Warning: %s", err)
 		}
-		if err := devices[sysfsObjects[d].Name()].updateEnclSlot(); err != nil {
+		if err := Devices[name].updateEnclSlot(); err != nil {
 			log.Printf("Warning: %s", err)
 		}
+
+		// Populate DevicesBySerial
+		if Devices[name].Serial != "" {
+			if DevicesBySerial[Devices[name].Serial] == nil {
+				DevicesBySerial[Devices[name].Serial] = map[*Device]bool{}
+			}
+			DevicesBySerial[Devices[name].Serial][Devices[name]] = true
+		}
+
+		// Populate DevicesBySASAddress
+		if Devices[name].SasAddress != "" {
+			if DevicesBySASAddress[Devices[name].SasAddress] == nil {
+				DevicesBySASAddress[Devices[name].SasAddress] = map[*Device]bool{}
+			}
+			DevicesBySASAddress[Devices[name].SasAddress][Devices[name]] = true
+		}
+
+		/*if Devices[name].Type == 13 {
+			Enclosures[name] = &Enclosure{
+				sysfsObj: ,
+			}
+		}*/
 	}
-	multiPathDevices := updateMultiPaths(devices)
-	return devices, multiPathDevices, HBAs, nil
+	multiPathDevices := updateMultiPaths(Devices, DevicesBySerial, DevicesBySASAddress)
+
+	return Devices, multiPathDevices, HBAs, nil
 
 }
