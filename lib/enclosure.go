@@ -6,6 +6,11 @@ import (
 	"os/exec"
 )
 
+// Enclosure is a SCSI Enclosure Device
+type Enclosure struct {
+	MultiPathDevice *MultiPathDevice
+}
+
 func (d *Device) updateEnclosureSerial() (err error) {
 	var sn string
 
