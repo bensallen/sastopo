@@ -15,15 +15,24 @@ func findDevMissingPaths(count int, devices map[string]*sastopo.Device) {
 }
 
 func main() {
-	devices, _, HBAs, err := sastopo.ScsiDevices()
+	devices, multiPathDevices, enclosures, hbas, err := sastopo.ScsiDevices()
 	if err != nil {
 		fmt.Print(err)
 	}
-	for _, device := range devices {
-		fmt.Printf("Found Device: %#v \n", device.HBA)
-	}
-	fmt.Printf("Found HBAs: %#v \n", HBAs)
+	fmt.Printf("Found %d Devices\n", len(devices))
+	//for _, device := range devices {
+	//	fmt.Printf("Found Device: %p\n", device.Enclosure)
+	//}
+	fmt.Printf("Found %d Unique Multi-pathed Devices\n", len(multiPathDevices))
+	fmt.Printf("Found %d HBAs\n", len(hbas))
 
-	findDevMissingPaths(2, devices)
+	fmt.Printf("Found %d Enclosures\n", len(enclosures))
+	for enclosure := range enclosures {
+		fmt.Printf("Found Enclosure: %p with %d slots populated\n", enclosure, len(enclosure.Slots))
+		//for slot := range enclosure.Slots {
+		//	fmt.Printf("%s\n", slot)
+		//}
+	}
+	//findDevMissingPaths(2, devices)
 
 }

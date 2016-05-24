@@ -1,6 +1,7 @@
 package sastopo
 
 import (
+	"errors"
 	"log"
 	"path/filepath"
 	"strconv"
@@ -20,7 +21,7 @@ type Device struct {
 	Serial     string
 	Block      string
 	SG         string
-	Enclosure  *Device
+	Enclosure  *Enclosure
 	HBA        *HBA
 	Port       string
 	Slot       string
@@ -108,6 +109,9 @@ func (d *Device) updateSerial() error {
 // of the device
 func (d *Device) updatePathVars(HBAs map[string]*HBA) error {
 	p := strings.Split(string(d.sysfsObj), "/")
+	if len(p) < 8 {
+		return errors.New("Unexpected Sysfs path: must have least 8 elements in path: " + string(d.sysfsObj))
+	}
 	if HBAs[p[5]] != nil {
 		d.HBA = HBAs[p[5]]
 	} else {
@@ -140,34 +144,79 @@ func (d *Device) updateEnclSlot() error {
 	return nil
 }
 
+// GetUniqID first tries to return the serial number, if it doesn't exist it falls back to
+// SASAddress. If neither exist an empty string is returned and an error.
+/*func (d *Device) GetUniqID() (string, error) {
+	if d.Serial != "" {
+		return d.Serial, nil
+	} else if d.SasAddress != "" {
+		return d.SasAddress, nil
+	}
+	return "", errors.New("Serial and SasAddress not found")
+
+}*/
+
 func updateMultiPaths(devices map[string]*Device, devicesBySerial map[string]map[*Device]bool, devicesBySASAddress map[string]map[*Device]bool) map[string]*MultiPathDevice {
 	var multiPathDevices = map[string]*MultiPathDevice{}
 	for _, device := range devices {
-
+		var multiPath *MultiPathDevice
+		var uniqDevice map[*Device]bool
+		var id string
 		if devicesBySerial[device.Serial] != nil {
-			device.MultiPath = &MultiPathDevice{
-				Paths: devicesBySerial[device.Serial],
-			}
-			multiPathDevices[device.Serial] = device.MultiPath
+			uniqDevice = devicesBySerial[device.Serial]
+			id = device.Serial
 		} else if devicesBySASAddress[device.SasAddress] != nil {
-			device.MultiPath = &MultiPathDevice{
-				Paths: devicesBySASAddress[device.SasAddress],
-			}
-			multiPathDevices[device.SasAddress] = device.MultiPath
+			uniqDevice = devicesBySerial[device.SasAddress]
+			id = device.SasAddress
 		} else {
 			log.Printf("Warning: Did not find device: %s, in devicesBySerial or devicesBySASAddress", device.ID)
+			continue
 		}
+
+		if multiPathDevices[id] == nil {
+			multiPath = &MultiPathDevice{
+				Paths: uniqDevice,
+			}
+		} else {
+			multiPath = multiPathDevices[id]
+		}
+		device.MultiPath = multiPath
+		multiPathDevices[device.Serial] = multiPath
+
 	}
 	return multiPathDevices
 }
 
+func updateEnclosure(devices map[string]*Device, enclosures map[*Enclosure]bool) {
+	var enclosuresBySysfsPrefix = map[string]*Enclosure{}
+	for enclosure := range enclosures {
+		for device := range enclosure.MultiPathDevice.Paths {
+			path := strings.Split(string(device.sysfsObj), "/")
+			enclosuresBySysfsPrefix[strings.Join(path[0:8], "/")] = enclosure
+		}
+	}
+	for _, device := range devices {
+		path := strings.Split(string(device.sysfsObj), "/")
+		device.Enclosure = enclosuresBySysfsPrefix[strings.Join(path[0:8], "/")]
+		if device.Slot != "" && device.Enclosure != nil {
+			if device.Enclosure.Slots == nil {
+				device.Enclosure.Slots = map[string]*MultiPathDevice{}
+			}
+			device.Enclosure.Slots[device.Slot] = device.MultiPath
+		}
+	}
+}
+
 // ScsiDevices returns map[string]*Device of all SCSI devices and
 // map[string]*MultiPathDevice of all resolved unique end devices
-func ScsiDevices() (map[string]*Device, map[string]*MultiPathDevice, map[string]*HBA, error) {
-	var Devices = map[string]*Device{}
-	var DevicesBySerial = map[string]map[*Device]bool{}
-	var DevicesBySASAddress = map[string]map[*Device]bool{}
-	var HBAs = map[string]*HBA{}
+func ScsiDevices() (map[string]*Device, map[string]*MultiPathDevice, map[*Enclosure]bool, map[string]*HBA, error) {
+	var (
+		Devices             = map[string]*Device{}
+		DevicesBySerial     = map[string]map[*Device]bool{}
+		DevicesBySASAddress = map[string]map[*Device]bool{}
+		HBAs                = map[string]*HBA{}
+		EnclMap             = map[*Device]bool{}
+	)
 	//var Enclosures = map[string]*Enclosure{}
 
 	scsiDeviceObj := sysfs.Class.Object("scsi_device")
@@ -208,14 +257,16 @@ func ScsiDevices() (map[string]*Device, map[string]*MultiPathDevice, map[string]
 			DevicesBySASAddress[Devices[name].SasAddress][Devices[name]] = true
 		}
 
-		/*if Devices[name].Type == 13 {
-			Enclosures[name] = &Enclosure{
-				sysfsObj: ,
-			}
-		}*/
+		// Populate EnclMap
+		if Devices[name].Type == 13 {
+			EnclMap[Devices[name]] = true
+		}
 	}
+	// Assign MultiPathDevice to Devices, get back map of all MultiPath Devices
 	multiPathDevices := updateMultiPaths(Devices, DevicesBySerial, DevicesBySASAddress)
+	enclosures := Enclosures(EnclMap)
+	updateEnclosure(Devices, enclosures)
 
-	return Devices, multiPathDevices, HBAs, nil
+	return Devices, multiPathDevices, enclosures, HBAs, nil
 
 }

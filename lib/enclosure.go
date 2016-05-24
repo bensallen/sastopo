@@ -9,6 +9,7 @@ import (
 // Enclosure is a SCSI Enclosure Device
 type Enclosure struct {
 	MultiPathDevice *MultiPathDevice
+	Slots           map[string]*MultiPathDevice
 }
 
 func (d *Device) updateEnclosureSerial() (err error) {
@@ -62,4 +63,24 @@ func ddnSA4600EnclosureSerial(sg string) (string, error) {
 	}
 	//log.Printf("Found %d bytes of data from sg_ses, serial is: %#v", n, string(page7[2068:2084]))
 	return string(page7[2068:2084]), nil
+}
+
+// Enclosures returns a map of all unique Enclosures based on the input *Device map.
+// Also updates the Enclosure device's Enclosure attribute.
+func Enclosures(enclMap map[*Device]bool) map[*Enclosure]bool {
+	var (
+		multiPathDevices = map[*MultiPathDevice]bool{}
+		enclosures       = map[*Enclosure]bool{}
+	)
+	for encl := range enclMap {
+		multiPathDevices[encl.MultiPath] = true
+	}
+	for multiPathDevice := range multiPathDevices {
+		enclosure := &Enclosure{MultiPathDevice: multiPathDevice}
+		enclosures[enclosure] = true
+		for device := range multiPathDevice.Paths {
+			device.Enclosure = enclosure
+		}
+	}
+	return enclosures
 }
