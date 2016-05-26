@@ -17,7 +17,11 @@ func (d *Device) updateEnclosureSerial() (err error) {
 
 	switch d.Model {
 	case "SA4600":
-		if sn, err = ddnSA4600EnclosureSerial(d.SG); err != nil {
+		if sn, err = sgSesEnclosureSerial(d.SG, 2068, 16); err != nil {
+			return err
+		}
+	case "DCS3700":
+		if sn, err = sgSesEnclosureSerial(d.SG, 2327, 10); err != nil {
 			return err
 		}
 	default:
@@ -30,15 +34,15 @@ func (d *Device) updateEnclosureSerial() (err error) {
 	return nil
 }
 
-// The DDN SA4600 doesn't support vpd_80 for SN. However SES page
-// 0x7 has a vendor specific element [0x8e] that shows a device
-// labeled as "SHELF" or "Dragon Enclosure" in page 0x1.
+// The DDN SA4600 and IBM DCS3700 doesn't support vpd_80 for SN.
+// However SES page 0x7 has a vendor specific element [0x8e] that
+// shows a device labeled as "SHELF" or "Dragon Enclosure" in page 0x1.
 // We use sg_ses --hex output, drop all the whitespace and use
 // hex.Decode() to turn it into a useable []byte. Finally we take
-// the appropraite offset in the 0x7 page, 2068, and grab 16 bytes
+// the appropraite offset in the 0x7 page, and grab 16 bytes (length)
 // which makes up the serial number.
 // This function requires root privledges and sg3_utils to be installed.
-func ddnSA4600EnclosureSerial(sg string) (string, error) {
+func sgSesEnclosureSerial(sg string, offset int, length int) (string, error) {
 	var (
 		cmdOut []byte
 		sn     string
@@ -62,7 +66,7 @@ func ddnSA4600EnclosureSerial(sg string) (string, error) {
 		return sn, err
 	}
 	//log.Printf("Found %d bytes of data from sg_ses, serial is: %#v", n, string(page7[2068:2084]))
-	return string(page7[2068:2084]), nil
+	return string(page7[offset : offset+length]), nil
 }
 
 // Enclosures returns a map of all unique Enclosures based on the input *Device map.
