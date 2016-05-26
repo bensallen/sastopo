@@ -1,9 +1,6 @@
 package sastopo
 
-import "fmt"
+import "errors"
 
-type errUnknownType struct{ Msg string }
-
-func (e *errUnknownType) Error() string {
-	return fmt.Sprintf("unknown device type: %s", e.Msg)
-}
+// ErrUnknownType is when a SCSI device is found that isn't a type that we know how to handle
+var ErrUnknownType = errors.New("unknown device type")
