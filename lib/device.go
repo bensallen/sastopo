@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/bensallen/go-sysfs"
@@ -100,7 +99,7 @@ func (d *Device) updateSerial() error {
 			return err
 		}
 	default:
-		return &errUnknownType{"dev: " + d.ID + " type: " + strconv.Itoa(d.Type)}
+		return ErrUnknownType
 	}
 	return nil
 }
@@ -187,17 +186,22 @@ func updateMultiPaths(devices map[string]*Device, devicesBySerial map[string]map
 	return multiPathDevices
 }
 
-func updateEnclosure(devices map[string]*Device, enclosures map[*Enclosure]bool) {
+// updateEnclosure iterates through all input devices, and compares the
+// sysfs path to the input enclosures. We look at the first n element in
+// the path. An enclosure's path will match the path of its devices typically
+// till the SCSI port or first expander, Example of the latter:
+// /sys/devices/pci0000:80/0000:80:03.0/0000:90:00.0/host2/port-2:0/expander-2:0
+func updateEnclosure(devices map[string]*Device, enclosures map[*Enclosure]bool, n int) {
 	var enclosuresBySysfsPrefix = map[string]*Enclosure{}
 	for enclosure := range enclosures {
 		for device := range enclosure.MultiPathDevice.Paths {
 			path := strings.Split(string(device.sysfsObj), "/")
-			enclosuresBySysfsPrefix[strings.Join(path[0:8], "/")] = enclosure
+			enclosuresBySysfsPrefix[strings.Join(path[0:n], "/")] = enclosure
 		}
 	}
 	for _, device := range devices {
 		path := strings.Split(string(device.sysfsObj), "/")
-		device.Enclosure = enclosuresBySysfsPrefix[strings.Join(path[0:8], "/")]
+		device.Enclosure = enclosuresBySysfsPrefix[strings.Join(path[0:n], "/")]
 		if device.Slot != "" && device.Enclosure != nil {
 			if device.Enclosure.Slots == nil {
 				device.Enclosure.Slots = map[string]*MultiPathDevice{}
@@ -208,8 +212,11 @@ func updateEnclosure(devices map[string]*Device, enclosures map[*Enclosure]bool)
 }
 
 // ScsiDevices returns map[string]*Device of all SCSI devices and
-// map[string]*MultiPathDevice of all resolved unique end devices
-func ScsiDevices() (map[string]*Device, map[string]*MultiPathDevice, map[*Enclosure]bool, map[string]*HBA, error) {
+// map[string]*MultiPathDevice of all resolved unique end devices.
+// Takes an int that specifies how many elements of the devices
+// and enclosure sysfs path to match against to assign a device
+// to an enclosure.
+func ScsiDevices(sysfsMatchPathEncl int) (map[string]*Device, map[string]*MultiPathDevice, map[*Enclosure]bool, map[string]*HBA, error) {
 	var (
 		Devices             = map[string]*Device{}
 		DevicesBySerial     = map[string]map[*Device]bool{}
@@ -217,7 +224,6 @@ func ScsiDevices() (map[string]*Device, map[string]*MultiPathDevice, map[*Enclos
 		HBAs                = map[string]*HBA{}
 		EnclMap             = map[*Device]bool{}
 	)
-	//var Enclosures = map[string]*Enclosure{}
 
 	scsiDeviceObj := sysfs.Class.Object("scsi_device")
 	sysfsObjects := scsiDeviceObj.SubObjects()
@@ -232,7 +238,13 @@ func ScsiDevices() (map[string]*Device, map[string]*MultiPathDevice, map[*Enclos
 			log.Printf("Warning: %s", err)
 		}
 		if err := Devices[name].updateSerial(); err != nil {
-			log.Printf("Warning: %s", err)
+			if err == ErrUnknownType {
+				delete(Devices, name)
+				log.Printf("Warning, %s, skipping device %s", err, name)
+				continue
+			} else if err != nil {
+				log.Printf("Warning: %s", err)
+			}
 		}
 		if err := Devices[name].updatePathVars(HBAs); err != nil {
 			log.Printf("Warning: %s", err)
@@ -265,7 +277,7 @@ func ScsiDevices() (map[string]*Device, map[string]*MultiPathDevice, map[*Enclos
 	// Assign MultiPathDevice to Devices, get back map of all MultiPath Devices
 	multiPathDevices := updateMultiPaths(Devices, DevicesBySerial, DevicesBySASAddress)
 	enclosures := Enclosures(EnclMap)
-	updateEnclosure(Devices, enclosures)
+	updateEnclosure(Devices, enclosures, sysfsMatchPathEncl)
 
 	return Devices, multiPathDevices, enclosures, HBAs, nil
 
