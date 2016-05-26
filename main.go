@@ -15,7 +15,7 @@ func findDevMissingPaths(count int, devices map[string]*sastopo.Device) {
 }
 
 func main() {
-	devices, multiPathDevices, enclosures, hbas, err := sastopo.ScsiDevices()
+	devices, multiPathDevices, enclosures, hbas, err := sastopo.ScsiDevices(8)
 	if err != nil {
 		fmt.Print(err)
 	}
