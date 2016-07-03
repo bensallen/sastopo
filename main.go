@@ -34,5 +34,4 @@ func main() {
 		//}
 	}
 	//findDevMissingPaths(2, devices)
-
 }
