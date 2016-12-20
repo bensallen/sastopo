@@ -106,7 +106,7 @@ func (d *Device) updateSerial() error {
 
 // Update HBA and Port attributes of device using the elements of sysfs path
 // of the device
-func (d *Device) updatePathVars(HBAs map[string]*HBA) error {
+func (d *Device) updatePathVars(HBAs map[string]*HBA, conf Conf) error {
 	p := strings.Split(string(d.sysfsObj), "/")
 	if len(p) < 8 {
 		return errors.New("Unexpected Sysfs path: must have least 8 elements in path: " + string(d.sysfsObj))
@@ -117,6 +117,7 @@ func (d *Device) updatePathVars(HBAs map[string]*HBA) error {
 		HBAs[p[5]] = &HBA{
 			PciID: p[5],
 			Host:  p[6],
+			Slot:  conf.HBALabels[p[5]],
 		}
 		d.HBA = HBAs[p[5]]
 	}
@@ -215,8 +216,8 @@ func updateEnclosure(devices map[string]*Device, enclosures map[*Enclosure]bool,
 // map[string]*MultiPathDevice of all resolved unique end devices.
 // Takes an int that specifies how many elements of the devices
 // and enclosure sysfs path to match against to assign a device
-// to an enclosure.
-func ScsiDevices(sysfsMatchPathEncl int) (map[string]*Device, map[string]*MultiPathDevice, map[*Enclosure]bool, map[string]*HBA, error) {
+// to an enclosure
+func ScsiDevices(conf Conf) (map[string]*Device, map[string]*MultiPathDevice, map[*Enclosure]bool, map[string]*HBA, error) {
 	var (
 		Devices             = map[string]*Device{}
 		DevicesBySerial     = map[string]map[*Device]bool{}
@@ -246,7 +247,7 @@ func ScsiDevices(sysfsMatchPathEncl int) (map[string]*Device, map[string]*MultiP
 				log.Printf("Warning: %s", err)
 			}
 		}
-		if err := Devices[name].updatePathVars(HBAs); err != nil {
+		if err := Devices[name].updatePathVars(HBAs, conf); err != nil {
 			log.Printf("Warning: %s", err)
 		}
 		if err := Devices[name].updateEnclSlot(); err != nil {
@@ -277,7 +278,7 @@ func ScsiDevices(sysfsMatchPathEncl int) (map[string]*Device, map[string]*MultiP
 	// Assign MultiPathDevice to Devices, get back map of all MultiPath Devices
 	multiPathDevices := updateMultiPaths(Devices, DevicesBySerial, DevicesBySASAddress)
 	enclosures := Enclosures(EnclMap)
-	updateEnclosure(Devices, enclosures, sysfsMatchPathEncl)
+	updateEnclosure(Devices, enclosures, conf.SysfsMatchPathEncl)
 
 	return Devices, multiPathDevices, enclosures, HBAs, nil
 

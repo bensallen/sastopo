@@ -39,7 +39,7 @@ func (d *Device) updateEnclosureSerial() (err error) {
 // shows a device labeled as "SHELF" or "Dragon Enclosure" in page 0x1.
 // We use sg_ses --hex output, drop all the whitespace and use
 // hex.Decode() to turn it into a useable []byte. Finally we take
-// the appropraite offset in the 0x7 page, and grab 16 bytes (length)
+// the appropraite "offset" bytes in the 0x7 page, and grab "length" bytes
 // which makes up the serial number.
 // This function requires root privledges and sg3_utils to be installed.
 func sgSesEnclosureSerial(sg string, offset int, length int) (string, error) {
