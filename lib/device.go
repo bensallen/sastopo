@@ -104,6 +104,48 @@ func (d *Device) updateSerial() error {
 	return nil
 }
 
+func findHBAPorts(host sysfs.Object) map[*HBAPort]bool {
+
+	var HBAPorts = map[*HBAPort]bool{}
+	//fmt.Printf("findHBAPorts SubObjectsFilter: %v\n", host.SubObjectsFilter("port-*"))
+	for _, port := range host.SubObjectsFilter("port-*") {
+		//fmt.Printf("findHBAPorts port: %v\n", port)
+
+		var phys = map[*Phy]bool{}
+
+		for _, phy := range port.SubObjectsFilter("phy-*") {
+			//fmt.Printf("findHBAPorts phy: %v\n", phy)
+
+			sasPhy := phy.SubObject("sas_phy").SubObject(phy.Name())
+
+			phyIdentifier, err := sasPhy.Attribute("phy_identifier").Read()
+			//fmt.Printf("findHBAPorts phyIdentifier: %v\n", phyIdentifier)
+
+			if err != nil {
+				continue
+			}
+			sasAddress, err := sasPhy.Attribute("sas_address").Read()
+			//fmt.Printf("findHBAPorts sasAddress: %v\n", sasAddress)
+			if err != nil {
+				continue
+			}
+
+			phys[&Phy{
+				PhyIdentifier: phyIdentifier,
+				SasAddress:    sasAddress,
+			}] = true
+
+		}
+		HBAPorts[&HBAPort{
+			PortID: port.Name(),
+			Phys:   phys,
+		}] = true
+
+	}
+
+	return HBAPorts
+}
+
 // Update HBA and Port attributes of device using the elements of sysfs path
 // of the device
 func (d *Device) updatePathVars(HBAs map[string]*HBA, conf Conf) error {
@@ -114,10 +156,14 @@ func (d *Device) updatePathVars(HBAs map[string]*HBA, conf Conf) error {
 	if HBAs[p[5]] != nil {
 		d.HBA = HBAs[p[5]]
 	} else {
+		host := d.sysfsObj.Parent(-7)
+		//fmt.Printf("updatePathVars host: %v\n", host)
+
 		HBAs[p[5]] = &HBA{
 			PciID: p[5],
 			Host:  p[6],
 			Slot:  conf.HBALabels[p[5]],
+			Ports: findHBAPorts(host),
 		}
 		d.HBA = HBAs[p[5]]
 	}

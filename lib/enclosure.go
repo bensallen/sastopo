@@ -88,3 +88,20 @@ func Enclosures(enclMap map[*Device]bool) map[*Enclosure]bool {
 	}
 	return enclosures
 }
+
+// SasAddress returns a slice of SasAddresses from the Enclosure Device
+func (e *Enclosure) SasAddress() []string {
+	var a []string
+	for device := range e.MultiPathDevice.Paths {
+		a = append(a, device.SasAddress)
+	}
+	return a
+}
+
+// SasAddress returns a slice of SasAddresses from the Enclosure Device
+func (e *Enclosure) Serial() string {
+	for device := range e.MultiPathDevice.Paths {
+		return device.Serial
+	}
+	return ""
+}

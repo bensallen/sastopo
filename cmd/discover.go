@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -65,13 +66,10 @@ func summary(devices map[string]*sastopo.Device, multiPathDevices map[string]*sa
 
 	fmt.Printf("Found %d Enclosures\n", len(enclosures))
 	for enclosure := range enclosures {
-		fmt.Printf("Found Enclosure: %p with %d slots populated\n", enclosure, len(enclosure.Slots))
+		fmt.Printf("Found Enclosure: %s with %d slots populated\n", enclosure.Serial(), len(enclosure.Slots))
 		for path := range enclosure.MultiPathDevice.Paths {
-			fmt.Printf("HBA: %s, Slot %s, Port: %s\n", path.HBA.PciID, path.HBA.Slot, path.Port)
+			fmt.Printf("HBA: %s, Slot %s, Port: %s, Phy IDs: %s\n", path.HBA.PciID, path.HBA.Slot, path.Port, strings.Join(path.HBA.Port(path.Port).PhyIds(), ","))
 		}
-		//for slot := range enclosure.Slots {
-		//	fmt.Printf("%s\n", slot)
-		//}
 	}
 }
 
