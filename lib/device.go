@@ -3,6 +3,7 @@ package sastopo
 import (
 	"errors"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -172,21 +173,43 @@ func (d *Device) updatePathVars(HBAs map[string]*HBA, conf Conf) error {
 	return nil
 }
 
-// updateEnclSlot updates Slot from sysfs, ex: <device>/enclosure_device:Slot 1
+// updateEnclSlot updates Slot from sysfs, ex: <device>/enclosure_device:Slot 1 or
+// contents of parent end_device's bay_identifier
 func (d *Device) updateEnclSlot() error {
-	files, err := filepath.Glob(string(d.sysfsObj) + "/enclosure_device:*")
-	if err != nil || len(files) == 0 {
-		return err
-	} else if len(files) > 1 {
-		log.Printf("Warning: found more than one enclosure_device for dev: %s, using the first one", d.ID)
+	// Only continue on type 0 devices (disks)
+	if d.Type != 0 {
+		return nil
 	}
 
-	path := strings.Split(files[0], "/")
-	enclSlot := strings.Split(path[len(path)-1], ":")
-	if len(enclSlot) == 2 {
-		d.Slot = strings.TrimSpace(enclSlot[1])
-	}
+	// Traverse up in path to disk's end_device
+	endDevice := d.sysfsObj.Parent(2)
+	// Newer kernels (RHEL 7.3) have bay_identifer in sysfs
+	if file, err := os.Open(string(endDevice) + "/sas_device/" + endDevice.Name() + "/bay_identifier"); err == nil {
+		// Not sure the actual size of bay_identifier, but it probably won't be bigger than 3 numbers.
+		slot := make([]byte, 3)
+		_, err := file.Read(slot)
+		if err != nil {
+			return err
+		}
+		d.Slot = string(slot)
+	} else {
+		// Older sysfs implmentations exposed slots directly in the target as a symlink named
+		// "enclosure_device:<slot name>". Try to parse slot out of that path.
+		files, err := filepath.Glob(string(d.sysfsObj) + "/enclosure_device:*")
 
+		if err != nil || len(files) == 0 {
+			return err
+		} else if len(files) > 1 {
+			log.Printf("Warning: found more than one enclosure_device for dev: %s, using the first one", d.ID)
+		}
+
+		path := strings.Split(files[0], "/")
+		log.Printf("updateEncSlot: path %v\n", path)
+		enclSlot := strings.Split(path[len(path)-1], ":")
+		if len(enclSlot) == 2 {
+			d.Slot = strings.TrimSpace(enclSlot[1])
+		}
+	}
 	return nil
 }
 
