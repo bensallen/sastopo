@@ -98,7 +98,7 @@ func (e *Enclosure) SasAddress() []string {
 	return a
 }
 
-// SasAddress returns a slice of SasAddresses from the Enclosure Device
+// Serial returns the first serial attribute from the Enclosure Device
 func (e *Enclosure) Serial() string {
 	for device := range e.MultiPathDevice.Paths {
 		return device.Serial
