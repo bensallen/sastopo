@@ -3,8 +3,8 @@ package sastopo
 import (
 	"errors"
 	"log"
-	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/bensallen/go-sysfs"
@@ -24,7 +24,7 @@ type Device struct {
 	Enclosure  *Enclosure
 	HBA        *HBA
 	Port       string
-	Slot       string
+	Slot       int
 	MultiPath  *MultiPathDevice
 	sysfsObj   sysfs.Object
 }
@@ -32,6 +32,39 @@ type Device struct {
 // MultiPathDevice contains Devices which has multiple paths
 type MultiPathDevice struct {
 	Paths map[*Device]bool
+}
+
+// Devices converts the MultiPathDevice Paths map to a slice of *Devices
+func (mpd *MultiPathDevice) Devices() []*Device {
+	var d []*Device
+	for device := range mpd.Paths {
+		d = append(d, device)
+	}
+	return d
+}
+
+// Serial returns the first serial attribute from a MultiPathDevice
+func (mpd *MultiPathDevice) Serial() string {
+	for device := range mpd.Paths {
+		return device.Serial
+	}
+	return ""
+}
+
+// Model returns the first model attribute from a MultiPathDevice
+func (mpd *MultiPathDevice) Model() string {
+	for device := range mpd.Paths {
+		return device.Model
+	}
+	return ""
+}
+
+// Vendor returns the first vendor attribute from a MultiPathDevice
+func (mpd *MultiPathDevice) Vendor() string {
+	for device := range mpd.Paths {
+		return device.Vendor
+	}
+	return ""
 }
 
 // updateSysfsAttrs adds or updates Model, Vendor, Rev, and SasAddress from sysfs for a sysfs object
@@ -68,15 +101,16 @@ func (d *Device) updateSysfsAttrs() error {
 	}
 	d.Type = devType
 
-	blocks := d.sysfsObj.SubObject("block").SubObjects()
-	if len(blocks) > 0 {
-		d.Block = blocks[0].Name()
+	block, err := d.sysfsObj.SubObject("block")
+	if err == nil {
+		d.Block = block.SubObjects()[0].Name()
 	}
 
-	sgs := d.sysfsObj.SubObject("scsi_generic").SubObjects()
-	if len(sgs) > 0 {
-		d.SG = sgs[0].Name()
+	sg, err := d.sysfsObj.SubObject("scsi_generic")
+	if err == nil {
+		d.SG = sg.SubObjects()[0].Name()
 	}
+
 	return nil
 }
 
@@ -117,7 +151,17 @@ func findHBAPorts(host sysfs.Object) map[*HBAPort]bool {
 		for _, phy := range port.SubObjectsFilter("phy-*") {
 			//fmt.Printf("findHBAPorts phy: %v\n", phy)
 
-			sasPhy := phy.SubObject("sas_phy").SubObject(phy.Name())
+			sasPhy, err := phy.SubObject("sas_phy")
+
+			if err != nil {
+				continue
+			}
+
+			sasPhy, err = sasPhy.SubObject(phy.Name())
+
+			if err != nil {
+				continue
+			}
 
 			phyIdentifier, err := sasPhy.Attribute("phy_identifier").Read()
 			//fmt.Printf("findHBAPorts phyIdentifier: %v\n", phyIdentifier)
@@ -184,15 +228,16 @@ func (d *Device) updateEnclSlot() error {
 	// Traverse up in path to disk's end_device
 	endDevice := d.sysfsObj.Parent(2)
 	// Newer kernels (RHEL 7.3) have bay_identifer in sysfs
-	if file, err := os.Open(string(endDevice) + "/sas_device/" + endDevice.Name() + "/bay_identifier"); err == nil {
-		// Not sure the actual size of bay_identifier, but it probably won't be bigger than 3 numbers.
-		slot := make([]byte, 3)
-		_, err := file.Read(slot)
-		if err != nil {
-			return err
-		}
-		d.Slot = string(slot)
+
+	sasDevice, err1 := endDevice.SubObject("sas_device/" + endDevice.Name())
+
+	slot, err2 := sasDevice.Attribute("bay_identifier").ReadInt()
+	//fmt.Printf("Vendor: %s, Model: %s, endDevice: %s, sasDevice: %s, slot %d\n", d.Vendor, d.Model, endDevice, sasDevice, slot)
+
+	if err1 == nil && err2 == nil {
+		d.Slot = slot
 	} else {
+
 		// Older sysfs implmentations exposed slots directly in the target as a symlink named
 		// "enclosure_device:<slot name>". Try to parse slot out of that path.
 		files, err := filepath.Glob(string(d.sysfsObj) + "/enclosure_device:*")
@@ -204,10 +249,10 @@ func (d *Device) updateEnclSlot() error {
 		}
 
 		path := strings.Split(files[0], "/")
-		log.Printf("updateEncSlot: path %v\n", path)
 		enclSlot := strings.Split(path[len(path)-1], ":")
 		if len(enclSlot) == 2 {
-			d.Slot = strings.TrimSpace(enclSlot[1])
+			d.Slot, err = strconv.Atoi(strings.TrimSpace(enclSlot[1]))
+			return err
 		}
 	}
 	return nil
@@ -272,11 +317,14 @@ func updateEnclosure(devices map[string]*Device, enclosures map[*Enclosure]bool,
 	for _, device := range devices {
 		path := strings.Split(string(device.sysfsObj), "/")
 		device.Enclosure = enclosuresBySysfsPrefix[strings.Join(path[0:n], "/")]
-		if device.Slot != "" && device.Enclosure != nil {
+		if device.Enclosure != nil {
 			if device.Enclosure.Slots == nil {
-				device.Enclosure.Slots = map[string]*MultiPathDevice{}
+				device.Enclosure.Slots = map[int]*MultiPathDevice{}
 			}
-			device.Enclosure.Slots[device.Slot] = device.MultiPath
+			// Only assign disks (type 0) to slots
+			if device.Type == 0 {
+				device.Enclosure.Slots[device.Slot] = device.MultiPath
+			}
 		}
 	}
 }
@@ -300,9 +348,15 @@ func ScsiDevices(conf Conf) (map[string]*Device, map[string]*MultiPathDevice, ma
 
 	for d := 0; d < len(sysfsObjects); d++ {
 		name := sysfsObjects[d].Name()
+		sysfsObj, err := sysfsObjects[d].SubObject("device")
+		if err != nil {
+			log.Printf("Warning, %s, skipping device %s", err, name)
+			continue
+		}
 		Devices[name] = &Device{
 			ID:       name,
-			sysfsObj: sysfsObjects[d].SubObject("device"),
+			sysfsObj: sysfsObj,
+			Type:     -1,
 		}
 		if err := Devices[name].updateSysfsAttrs(); err != nil {
 			log.Printf("Warning: %s", err)
@@ -319,8 +373,11 @@ func ScsiDevices(conf Conf) (map[string]*Device, map[string]*MultiPathDevice, ma
 		if err := Devices[name].updatePathVars(HBAs, conf); err != nil {
 			log.Printf("Warning: %s", err)
 		}
-		if err := Devices[name].updateEnclSlot(); err != nil {
-			log.Printf("Warning: %s", err)
+
+		if Devices[name].Type == 0 {
+			if err := Devices[name].updateEnclSlot(); err != nil {
+				log.Printf("Warning: %s", err)
+			}
 		}
 
 		// Populate DevicesBySerial
