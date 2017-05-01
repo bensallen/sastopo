@@ -1,10 +1,10 @@
-memo = "dc07d521395440bcde96720104f337d68241fc46bc3dbc1e7ea8da3653472841"
+memo = "fc2a2b273092cc02f6f81aa498be445ffaded1d4496eda997b26e04364a66f54"
 
 [[projects]]
   branch = "master"
   name = "github.com/bensallen/go-sysfs"
   packages = ["."]
-  revision = "1158cb0ffe39bf805c7024d8ad1c7a2ad68e21c8"
+  revision = "9880ec88daf0d25c78da736aba5b92693d1bdb5f"
 
 [[projects]]
   name = "github.com/fsnotify/fsnotify"
@@ -100,4 +100,4 @@ memo = "dc07d521395440bcde96720104f337d68241fc46bc3dbc1e7ea8da3653472841"
   branch = "v2"
   name = "gopkg.in/yaml.v2"
   packages = ["."]
-  revision = "4c78c975fe7c825c6d1466c42be594d1d6f3aba6"
+  revision = "cd8b52f8269e0feb286dfeef29f8fe4d5b397e0b"
