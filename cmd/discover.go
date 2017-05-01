@@ -7,6 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"sort"
+
 	sastopo "gitlab.alcf.anl.gov/jlse/sastopo/lib"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -66,10 +68,31 @@ func summary(devices map[string]*sastopo.Device, multiPathDevices map[string]*sa
 
 	fmt.Printf("Found %d Enclosures\n", len(enclosures))
 	for enclosure := range enclosures {
-		fmt.Printf("Found Enclosure: %s with %d slots populated\n", enclosure.Serial(), len(enclosure.Slots))
+		fmt.Printf("Enclosure: \n    Vendor: %s, Model: %s, Serial: %s\n", enclosure.Vendor(), enclosure.Model(), enclosure.Serial())
+
+		fmt.Printf("    Paths:\n")
 		for path := range enclosure.MultiPathDevice.Paths {
-			fmt.Printf("HBA: %s, Slot %s, Port: %s, Phy IDs: %s\n", path.HBA.PciID, path.HBA.Slot, path.Port, strings.Join(path.HBA.Port(path.Port).PhyIds(), ","))
+			fmt.Printf("        HBA: %s, Slot %s, Port: %s, Phy IDs: %s\n", path.HBA.PciID, path.HBA.Slot, path.Port, strings.Join(path.HBA.Port(path.Port).PhyIds(), ","))
 		}
+		fmt.Printf("    Slots %d of %d populated\n", len(enclosure.Slots), len(enclosure.Slots))
+
+		var slots []int
+		for slot := range enclosure.Slots {
+			slots = append(slots, slot)
+		}
+		sort.Ints(slots)
+
+		for _, slot := range slots {
+			fmt.Printf("    Slot: %d\n", slot)
+			mp := enclosure.Slots[slot]
+			fmt.Printf("        Vendor: %s, Model: %s, Serial: %s\n", mp.Vendor(), mp.Model(), mp.Serial())
+			mpDevices := mp.Devices()
+			fmt.Printf("        Paths:\n")
+			for i := 0; i < len(mpDevices); i++ {
+				fmt.Printf("            HBA: %s, SG: %s, Device: %s\n", mpDevices[i].HBA.Slot, mpDevices[i].SG, mpDevices[i].Block)
+			}
+		}
+
 	}
 }
 
