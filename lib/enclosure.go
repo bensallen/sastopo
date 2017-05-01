@@ -9,7 +9,7 @@ import (
 // Enclosure is a SCSI Enclosure Device
 type Enclosure struct {
 	MultiPathDevice *MultiPathDevice
-	Slots           map[string]*MultiPathDevice
+	Slots           map[int]*MultiPathDevice
 }
 
 func (d *Device) updateEnclosureSerial() (err error) {
@@ -102,6 +102,22 @@ func (e *Enclosure) SasAddress() []string {
 func (e *Enclosure) Serial() string {
 	for device := range e.MultiPathDevice.Paths {
 		return device.Serial
+	}
+	return ""
+}
+
+// Vendor returns the first vendor attribute from the Enclosure Device
+func (e *Enclosure) Vendor() string {
+	for device := range e.MultiPathDevice.Paths {
+		return device.Vendor
+	}
+	return ""
+}
+
+// Model returns the first model attribute from the Enclosure Device
+func (e *Enclosure) Model() string {
+	for device := range e.MultiPathDevice.Paths {
+		return device.Model
 	}
 	return ""
 }
