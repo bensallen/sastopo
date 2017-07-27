@@ -1,0 +1,8 @@
+# Number of expected paths to each SAS device
+expected_paths: 2
+
+# Labels of PCI bus addresses to Slot ID
+HBAs:
+  '0000:11:00.0': 'C3'
+  '0000:8b:00.0': 'C5'
+  '0000:90:00.0': 'C6'
