@@ -9,7 +9,7 @@ import (
 
 	"sort"
 
-	sastopo "gitlab.alcf.anl.gov/jlse/sastopo/lib"
+	sastopo "github.com/bensallen/sastopo/lib"
 	yaml "gopkg.in/yaml.v2"
 )
 

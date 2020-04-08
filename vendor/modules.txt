@@ -1,0 +1,61 @@
+# github.com/bensallen/go-sysfs v0.0.0-20170501043543-9880ec88daf0
+## explicit
+github.com/bensallen/go-sysfs
+# github.com/fsnotify/fsnotify v1.4.2
+## explicit
+github.com/fsnotify/fsnotify
+# github.com/hashicorp/hcl v0.0.0-20170509225359-392dba7d905e
+## explicit
+github.com/hashicorp/hcl
+github.com/hashicorp/hcl/hcl/ast
+github.com/hashicorp/hcl/hcl/parser
+github.com/hashicorp/hcl/hcl/scanner
+github.com/hashicorp/hcl/hcl/strconv
+github.com/hashicorp/hcl/hcl/token
+github.com/hashicorp/hcl/json/parser
+github.com/hashicorp/hcl/json/scanner
+github.com/hashicorp/hcl/json/token
+# github.com/inconshreveable/mousetrap v1.0.0
+## explicit
+github.com/inconshreveable/mousetrap
+# github.com/magiconair/properties v1.7.3
+## explicit
+github.com/magiconair/properties
+# github.com/mitchellh/mapstructure v0.0.0-20170523030023-d0303fe80992
+## explicit
+github.com/mitchellh/mapstructure
+# github.com/pelletier/go-buffruneio v0.2.0
+## explicit
+github.com/pelletier/go-buffruneio
+# github.com/pelletier/go-toml v1.0.0
+## explicit
+github.com/pelletier/go-toml
+# github.com/spf13/afero v0.0.0-20170217164146-9be650865eab
+## explicit
+github.com/spf13/afero
+github.com/spf13/afero/mem
+# github.com/spf13/cast v1.1.0
+## explicit
+github.com/spf13/cast
+# github.com/spf13/cobra v0.0.0-20170725120438-34594c771f2c
+## explicit
+github.com/spf13/cobra
+# github.com/spf13/jwalterweatherman v0.0.0-20170523133247-0efa5202c046
+## explicit
+github.com/spf13/jwalterweatherman
+# github.com/spf13/pflag v1.0.0
+## explicit
+github.com/spf13/pflag
+# github.com/spf13/viper v1.0.0
+## explicit
+github.com/spf13/viper
+# golang.org/x/sys v0.0.0-20170727135323-35ef4487ce0a
+## explicit
+golang.org/x/sys/unix
+# golang.org/x/text v0.0.0-20170714085652-836efe42bb4a
+## explicit
+golang.org/x/text/transform
+golang.org/x/text/unicode/norm
+# gopkg.in/yaml.v2 v2.0.0-20170721122051-25c4ec802a7d
+## explicit
+gopkg.in/yaml.v2

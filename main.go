@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"gitlab.alcf.anl.gov/jlse/sastopo/cmd"
+	"github.com/bensallen/sastopo/cmd"
 )
 
 func main() {
